@@ -1,0 +1,142 @@
+---
+title: "Investigating Exclusive Economic Zones (EEZ) for Marine Aquaculture"
+subtitle: "EDS-223 Assignment 4"
+author: "Isabella Segarra"
+date: 11-10-2025
+format: 
+  pdf: default 
+  html: default
+theme: pandoc
+execute: 
+  warning: false
+  message: false
+---
+# Title 
+
+![README](figs/README-screenshot.png)
+## Objectives:
+
+## Environment set-up
+Load relevant libraries.
+```{r}
+#| output: false
+#| message: false
+
+library(sf) # For vector data
+library(stars) # For raster data
+library(terra) # raster handling
+library(tmap) # For static and interactive maps
+library(here) # For importing data 
+library(tidyverse) # For data cleaning
+library(dplyr) # For filtering data 
+library(paletteer) # For pretty colors 
+library(testthat) # For efficient workflows 
+library(kableExtra) # For pretty tables 
+library(patchwork) # For plotting 
+
+```
+
+## Data Import and Preparation
+The data for this study includes a shapefile for the West Coast EEZ, bathymetry (depth) raster, and seas surface temperature raster. 
+
+### Species data
+The two focal species for this study are oysters and 
+
+### Sea Surface Temperature Data
+In this study, I will uses average annual sea surface temperature (SST) from 2008 to 2012. The data was from 
+It contains the following data: 
+```{r}
+#| output: false 
+#| message: false
+
+#......Import Sea Surface Temperature Data......
+
+# Read in SST rasters in a raster stack 
+sst_fp <- list.files(here("data"), pattern = "average_annual_sst_", full.names = TRUE)
+# Stack 
+sst <- rast(sst_fp)
+
+```
+EXPLAIN MORE HERE
+```{r}
+#......Data Wrangling......
+
+# check their CRS's (TURN INTO MESSAGE)
+print(st_crs(sst))
+
+# Find the average sea surface temperature from 2008-2012
+avg_sst <- mean(sst)
+
+# Convert average SST from Kelvin to Celsius
+avg_sst_c <- avg_sst - 273.15
+
+# Clear working environment
+rm(list = 'avg_sst')
+
+```
+
+### Depth Data
+This data includes a 
+```{r}
+#| output: false 
+#| message: false
+
+#......Import Depth Data......
+depth <- rast(here("data/depth.tif"))
+
+```
+EXPLAIN MORE HERE
+In this section, I matched the resolution (number and size of pixels) of depth to match `avg_sst_c`. 
+```{r}
+#......Data Wrangling......
+
+# Check the resolutions (TURN INTO IF ELSE STATEMENT)
+#if res(depth) >
+
+# resample to match resolutions 
+depth <- resample(depth, avg_sst_c, method = "bilinear")
+
+# Check that the resolutions match
+print(res(depth) == res(avg_sst_c))
+
+
+# Check that CRSs match 
+if (st_crs(depth) != st_crs(avg_sst_c)) {
+  warning("Coordinate refrence systems DO NOT match!")
+} else {
+  message("Coordiante refrence systems match!")
+}
+
+# Check that the extens of depth and avg_sst_c match
+if (ext(depth) != ext(avg_sst_c)) {
+  warning("Extents DO NOT match!")
+} else {
+  message("Extents match!")
+}
+
+# now stack
+
+#crop depth raster to match the extent of the SST raster
+
+# project(st_crs(sst))
+
+# crop depth raster to mtach mean(sst)
+
+```
+
+### EEZ Data
+Exclusive Economic Zones
+```{r}
+
+```
+
+Notes from office hours:
+- use for loop, function, 
+- resolution (size of pixels, number of pixels)
+- want to find cells in depth and mean sst where the depth & sst of oysters match
+- reclassify into 1 and 0/ True/False with reclassify()  with set depth and sst 
+  - reclassify by making a matrix and reclassify by that 
+  - depth_matrix <- matrix(Inf, 11, FALSE, 
+            11, 30, TRUE,
+            30, Inf, FALSE)
+  - 
