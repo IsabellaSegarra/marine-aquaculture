@@ -19,6 +19,7 @@ execute:
 ## Environment set-up
 Load relevant libraries.
 ```{r}
+#| label: Library import
 #| output: false
 #| message: false
 
@@ -42,8 +43,10 @@ The data for this study includes a shapefile for the West Coast EEZ, bathymetry 
 ### Species data
 The two focal species for this study are oysters and 
 
+INSERT MARKDOWN TABE WITH SPECIES DATA DETAILS
+
 ### Sea Surface Temperature Data
-In this study, I will uses average annual sea surface temperature (SST) from 2008 to 2012. The data was from 
+In this study, I will use average annual sea surface temperature (SST) from 2008 to 2012. The data was from 
 It contains the following data: 
 ```{r}
 #| output: false 
@@ -54,15 +57,13 @@ It contains the following data:
 # Read in SST rasters in a raster stack 
 sst_fp <- list.files(here("data"), pattern = "average_annual_sst_", full.names = TRUE)
 # Stack 
-sst <- rast(sst_fp)
+sst <- rast(sst_fp) %>% 
+  project("EPSG:4326") # project CRS 
 
 ```
 EXPLAIN MORE HERE
 ```{r}
 #......Data Wrangling......
-
-# check their CRS's (TURN INTO MESSAGE)
-print(st_crs(sst))
 
 # Find the average sea surface temperature from 2008-2012
 avg_sst <- mean(sst)
@@ -82,61 +83,154 @@ This data includes a
 #| message: false
 
 #......Import Depth Data......
-depth <- rast(here("data/depth.tif"))
+depth <- rast(here("data/depth.tif")) %>% 
+  project("EPSG:4326") # project CRS
 
 ```
 EXPLAIN MORE HERE
 In this section, I matched the resolution (number and size of pixels) of depth to match `avg_sst_c`. 
+
 ```{r}
-#......Data Wrangling......
+#......Crop depth raster......
 
-# Check the resolutions (TURN INTO IF ELSE STATEMENT)
-#if res(depth) >
+# Create extent of 'avg_sst_c'
+ext_sst <- ext(avg_sst_c)
 
-# resample to match resolutions 
-depth <- resample(depth, avg_sst_c, method = "bilinear")
+# Crop depth raster to match the extent of the SST raster
+depth_cropped <- crop(depth, ext_sst)
+
+# Ensure data was cropped 
+if(ncell(depth) == ncell(depth_cropped)) {
+  warning("data did not crop!")
+} else {
+  message("data cropped!")
+}
+
+```
+
+```{r}
+#......Resample......
+
+# Resample to match resolutions 
+depth <- resample(depth_cropped, avg_sst_c, method = "bilinear") # method bilinear 
 
 # Check that the resolutions match
-print(res(depth) == res(avg_sst_c))
+if (res(depth) == res(avg_sst_c)) {
+  message("Resolutions match!")
+} else {
+  print("Resolutions do not match")
+}
 
+# Remove 'depth_cropped' from environment
+rm(list = 'depth_cropped')
+
+```
+
+```{r}
+#......CRS check......
 
 # Check that CRSs match 
-if (st_crs(depth) != st_crs(avg_sst_c)) {
+if (crs(depth) != crs(avg_sst_c)) {
   warning("Coordinate refrence systems DO NOT match!")
 } else {
   message("Coordiante refrence systems match!")
-}
+} 
+```
+## Find suitable locations
 
-# Check that the extens of depth and avg_sst_c match
-if (ext(depth) != ext(avg_sst_c)) {
-  warning("Extents DO NOT match!")
-} else {
-  message("Extents match!")
-}
+### Reclassificaiton Matrix 
+In order to find suitable locations for the oyster, I need to reclassify `avvg_sst_c` and `depth` data into locations that are suitable for oysters. This process returns the cells in the raster that satisfy the criteria. 
 
-# now stack
+- 1: suitable locations
+- 0: unsuitable locations
+```{r}
+#......Reclassification matrix: sea surface temperature......
 
-#crop depth raster to match the extent of the SST raster
+sst_matrix <- matrix(c(-Inf, 11, 0, # values -Inf to 11 = 0
+                11, 30, 1,  # values 11 to 30 = 1
+                30, Inf, 0), # values 30 to Inf = 0
+              ncol = 3, byrow = TRUE)
 
-# project(st_crs(sst))
+# Apply the matrix to reclassify the raster, making all cells 0 or 1
+sst_rcl <- terra::classify(avg_sst_c, rcl = sst_matrix)
 
-# crop depth raster to mtach mean(sst)
+# TURN INTO MESSAGE STATEMENT
+freq(avg_sst_c)
+freq(sst_rcl)
 
 ```
 
-### EEZ Data
-Exclusive Economic Zones
+```{r}
+#......Reclassification matrix: Depth......
+
+depth_matrix <- matrix(c(-Inf, 70, 0, # values -Inf to 70 = 0
+                -70, 0, 1,  # values -70 to 0 = 1
+                0, Inf, 0), # values 
+              ncol = 3, byrow = TRUE)
+
+# Apply the matrix to reclassify the raster, making all cells 0 or 1
+depth_rcl <- terra::classify(depth, rcl = depth_matrix)
+
+# TURN INTO MESSAGE STATEMENT
+freq(depth)
+freq(depth_rcl)
+```
+
+I now have suitable locations for the specific sea surface temperature and depth specifications for oysters. To apply 
+```{r}
+#......Apply ......
+
+# Multiply reclassification matrices to find suitable locations 
+suitable_locations <- sst_rcl * depth_rcl 
+
+# Convert all zeros to NA values
+suitable_locations[suitable_locations == 0] <- NA
+
+# expanse functions finds  (Put into kable table)
+suitable_area <- expanse(suitable_locations, unit = "km")
+
+kable(suitable_area)
+
+print(paste("The total suitable area for oysters is", suitable_area$area, "km"))
+```
+
+## Determine the most suitable EEZ
+Exclusive Economic Zones are regions of the ocean that are open for a country to explore. The U.S. West coast has five regions. In this section, I will determine the total suitable area within each EEZ for oysters. 
+
 ```{r}
 
+#......Import Data and Check CRS......
+
+# Import data
+eez <- st_read(here("data", "wc_regions_clean.shp")) 
+
+
+# Check if CRS match 
+if (st_crs(eez) == st_crs(4326)) {
+  message("CRS Match with depth and average sea surface temperature")
+} else {
+  warning("CRS does not match!")
+}
+
+```
+### Select suitable cells within West Coast EEZs
+```{r}
+
+# Mask suitable locations to eez habitat  
+eez_cells <- mask(suitable_locations, eez)
+
+# Calculate cell size area 
+eez_cells_area <- cellSize(eez_cells)
+
+
+# Find total area 
+area_by_eez <- terra::extract(eez_cells_area, eez, fun = sum, na.rm = TRUE)
+
+
 ```
 
-Notes from office hours:
-- use for loop, function, 
-- resolution (size of pixels, number of pixels)
-- want to find cells in depth and mean sst where the depth & sst of oysters match
-- reclassify into 1 and 0/ True/False with reclassify()  with set depth and sst 
-  - reclassify by making a matrix and reclassify by that 
-  - depth_matrix <- matrix(Inf, 11, FALSE, 
-            11, 30, TRUE,
-            30, Inf, FALSE)
-  - 
+```{r}
+tm_shape(eez_cells)+
+  tm_polygons()
+```
+
