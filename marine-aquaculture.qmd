@@ -9,23 +9,23 @@ format:
 theme: pandoc
 execute: 
   warning: false
-  message: false
 ---
-# Species for Marine Aquaculture in West Coast EEZs
+# Assessing Potential Species for Marine Aquaculture in West Coast EEZs
 
-![README](figs/README-screenshot.png)
+![README](
 
 ## Objectives:
-Marine aquaculture has become popular for its use as a more suitable protein option than land-based meat production.In this project, I investigated where to prioritize marine aquaculture in the West Coast of the United States. I focused on two focal species: oysters and blue mussels. 
+Marine aquaculture has become popular for its use as a more suitable protein option than land-based meat production.In this project, I investigated where to prioritize marine aquaculture in the West Coast of the United States. I focused on two focal species: **oysters** and **blue mussels**. 
 
 My workflow outline is as follows:
+
 1. Process sea surface temperature data
 2. Process depth data
 3. Reclassify sea surface temperature and depth data
-4. Apply mask 
+4. Find suitable locations that satisfy temperature and depth specifications
+5. Map suitable locations within West Coast EEZs
+6. Generalizable function 
 
-- process sea surface and depth data 
-- find suitable locations for 
 
 ## Environment set-up
 Load relevant libraries.
@@ -54,10 +54,14 @@ The data for this study includes a shapefile for the West Coast EEZ, bathymetry 
 ### Species data
 The two focal species for this study are oysters and blue mussels (*Mytilus edulis*). Both of these bivalve species are found in the Pacific ocean and have the ability to serve as a great protein source for marine aquaculture. 
 
-![Oyster photo]()
-![Blue mussel]()
+
+![Pacific Oyster](images/pacific_oyster.jpg){width=300px} 
+
+![Blue Mussel](images/o_mytedu.jpg){width=300px}
+
 
 ```{r}
+#| label: table species info
 #| echo: false 
 
 species <- c("Oysters", "Blue Mussel")
@@ -82,6 +86,7 @@ species_table %>%
 In this study, I will use average annual sea surface temperature (SST) from 2008 to 2012. The data is from NOAA's Daily Global Satellite Sea Surface Temperature anomaly. 
 It contains the following data: 
 ```{r}
+#| label: import SST 
 #| output: false 
 #| message: false
 
@@ -93,10 +98,13 @@ sst_fp <- list.files(here("data"), pattern = "average_annual_sst_", full.names =
 sst <- rast(sst_fp) %>% 
   project("EPSG:4326") # project CRS 
 
+# Clear working environment 
+rm(list = 'sst_fp')
 ```
 
 In this section, I will process the sea surface temperature (SST) data in order to combine it with the depth data. The SST data needs to be averaged and converted into celcius. 
 ```{r}
+#| label: SST data wrangling 
 #......Data Wrangling......
 
 # Find the average sea surface temperature from 2008-2012
@@ -113,6 +121,7 @@ rm(list = 'avg_sst')
 ### Depth Data
 In this study, I will use bathymetry data from the General Bathymetric Chart of the Oceans. 
 ```{r}
+#| label: Depth data import 
 #| output: false 
 #| message: false
 
@@ -125,6 +134,7 @@ depth <- rast(here("data/depth.tif")) %>%
 In this section, I matched the resolution (number and size of pixels) of depth to match `avg_sst_c`.
 
 ```{r}
+#| label: Depth data crop
 #......Crop depth raster......
 
 # Create extent of 'avg_sst_c'
@@ -143,6 +153,7 @@ if(ncell(depth) == ncell(depth_cropped)) {
 ```
 
 ```{r}
+#| label: Depth data resample
 #......Resample......
 
 # Resample to match resolutions 
@@ -161,6 +172,7 @@ rm(list = 'depth_cropped')
 ```
 
 ```{r}
+#| label: CRS check  
 #......CRS check......
 
 # Check that CRSs match 
@@ -175,10 +187,12 @@ In this section I will find suitable locations (area in km) that satisfy the spe
 
 ### Reclassificaiton Matrix 
 In order to find suitable locations for the oyster, I need to reclassify `avvg_sst_c` and `depth` data into locations that are suitable for oysters. This process returns the cells in the raster that satisfy the criteria. 
+
 - 1: suitable locations
 - 0: unsuitable locations
 
 ```{r}
+#| label: Reclassify SST
 #......Reclassification matrix: sea surface temperature......
 
 sst_matrix <- matrix(c(-Inf, 11, 0, # values -Inf to 11 = 0
@@ -209,6 +223,7 @@ if (identical(values(avg_sst_c), values(sst_rcl))) {
 ```
 
 ```{r}
+#| label: Reclassify depth
 #......Reclassification matrix: Depth......
 
 depth_matrix <- matrix(c(-Inf, -70, 0, # values -Inf to 70 = 0
@@ -235,7 +250,8 @@ if (identical(values(depth), values(depth_rcl))) {
 ```
 I now have suitable locations for the specific sea surface temperature and depth specifications for oysters.  
 ```{r}
-#......Apply ......
+#| label: Suitable locations
+#......Find suitable locations......
 
 # Multiply reclassification matrices to find suitable locations 
 suitable_locations <- sst_rcl * depth_rcl 
@@ -260,6 +276,7 @@ print(paste("The total suitable area for oysters is", round(suitable_area$area, 
 Exclusive Economic Zones are regions of the ocean that are open for a country to explore. The U.S. West coast has five regions. In this section, I will determine the total suitable area within each EEZ for oysters. This data is from [Marineregions.org](https://www.marineregions.org/eez.php).
 
 ```{r}
+#| label: EEZ data import 
 #| output: false 
 
 #......Import Data and Check CRS......
@@ -278,6 +295,7 @@ if (st_crs(eez) == st_crs(4326)) {
 ### Find suitable areas within West Coast EEZs
 In this section I will find the suitable areas within West Coast EEZs
 ```{r}
+#| label: Find suitable EEZs
 #......Apply mask ......
 
 # Mask suitable locations to eez habitat  
@@ -292,10 +310,11 @@ if (ncell(suitable_locations) == ncell(eez_cells)) {
 ```
 
 ```{r}
+#| label: Calculate total area
 #......Calculate total area ......
 
 # Calculate cell size area of each raster cell
-eez_cells_area <- cellSize(eez_cells)
+eez_cells_area <- cellSize(eez_cells, unit = "km")
 
 #......Find total area......
 
@@ -303,9 +322,12 @@ eez_cells_area <- cellSize(eez_cells)
 # Result is a data frame 
 area_by_eez <- terra::extract(eez_cells_area, eez, fun = sum, na.rm = TRUE)
 
+kable(area_by_eez)
+
 ```
 
 ```{r}
+#| label: Join data
 #......Join data......
 
 # Add polygon IDs to eez 
@@ -315,54 +337,62 @@ eez <- eez %>%
 # Join the raster summaries back to eez polygons df 
 eez_area <- eez %>%
   left_join(area_by_eez, by = "ID")
+
 ```
 
 ```{r}
+#| label: table suitable habitats
 #| echo: false 
 
 rgns <- c("Oregon", "Northern California", "Central California", "Southern California", "Washington")
 
-rgn_1_area <- eez_area$area_km2[1]
-rgn_2_area <- eez_area$area_km2[2]
-rgn_3_area <- eez_area$area_km2[3]
-rgn_4_area <- eez_area$area_km2[4]
-rgn_5_area <- eez_area$area_km2[5]
-
-rgn_areas <- c(rgn_1_area, rgn_2_area, rgn_3_area, rgn_4_area, rgn_5_area)
-
 rgn_table <- data.frame(
   rgns,
-  rgn_areas
+  area_km2 = eez_area$area[1:5]
 )
 
 # Put together with ‘kableExtra’
 rgn_table %>%
-  kable(col.names = c("Regions", "Suitable Habitat (km)"), caption = "Table 2. Suitable Area") %>%
+  kable(col.names = c("Regions", "Suitable Habitat (km)"), caption = "Table 2. Suitable Area for Oysters") %>%
   kable_styling(bootstrap_options = "striped", full_width = FALSE)
 ```
 ## Map: Oyster Suitable Area 
 ```{r}
 
-tm_tiles("Esri.WorldImagery") +
+#| label: oyster map
+oyster_map <- tm_tiles("Esri.WorldImagery", alpha = 0.6) + # basemap with tm_tiles()
 tm_shape(eez_area) +
-  tm_polygons(fill = "area_km2" , # fill polygons based on suitable area 
+  tm_polygons(fill = "area" , # fill polygons based on suitable area 
               style = "cont", # continuous value scale 
     palette = c("#9ef7f0", "#1d524d"), # palette of colors 
-    title = "Suitable habitat (km²)") + # legend title 
-  tm_layout(legend.outside = TRUE, legend.text.size = 0.8) + # legend position and size 
-  tm_title("Suitable Habitat Range for Oyster Marine Aquaculture", fontface = "bold", size = 1.5) +
-  tm_graticules(lwd = 0.2) +
-  tm_scalebar(position = c("left", "bottom"), text.size = 0.5) +
-  tm_text("rgn", size = 0.4)
+    title = "Suitable habitat (km²)", size = 0.8) + # legend title 
+  tm_layout(legend.outside = TRUE, 
+            legend.text.size = 0.5) + # legend position and size 
+  tm_title("Suitable Habitat Range for Oyster Aquaculture", fontface = "bold", size = 1) + # title 
+  tm_graticules(lwd = 0.2) + # gridlines 
+  tm_scalebar(position = c("left", "bottom"), text.size = 0.5) + #scalebar 
+  tm_text("rgn", # overlay text for region
+          size = 0.5,  
+          xmod = 0.2,
+  ymod = 0.2)
                 
-
+# View map
+oyster_map 
 ```
 
 ## Generalizable function
-
+The purpose of this section is to define a function that can be used with any marine species of interest for marine aquaculture. 
 ```{r}
+#| label: Generalizable function
+# Define function name and arguments 
 suitability_fun <- function(sst_min, sst_max, depth_min, depth_max, species) {
 
+# Ensure avg_sst_c and depth are new
+avg_sst_c <- rast(avg_sst_c)
+depth <- rast(depth)
+  
+# 1. Reclassification matrices 
+  
   # Define SST reclassification matrix 
   sst_matrix <- matrix(
     c(
@@ -381,28 +411,31 @@ suitability_fun <- function(sst_min, sst_max, depth_min, depth_max, species) {
       ),
     ncol = 3, byrow = TRUE
   )
-
+# 2. Reclassify SST and Depth data 
+  
   # Reclassify SST 
   sst_rcl <- terra::classify(avg_sst_c, rcl = sst_matrix)
-  
   # Fill NAN values with NAs 
   values(sst_rcl)[is.nan(values(sst_rcl))] <- NA
 
   # Reclassify depth 
   depth_rcl <- terra::classify(depth, rcl = depth_matrix)
-
+  
+# 3. Find suitable locations
   # Find suitable locations
   suitable_locations <- sst_rcl * depth_rcl
 
   # Convert zeros to NAs
   suitable_locations[suitable_locations == 0] <- NA
 
-  # Apply mask to keep onlu suitable raster cells in eez 
+  # Apply mask to keep only suitable raster cells in eez 
   eez_cells <- mask(suitable_locations, eez)
-
+  
   # Find cell area
-  eez_cells_area <- cellSize(eez_cells)
+  eez_cells_area <- cellSize(eez_cells, unit = "km")
 
+# 4. Summarize and create df 
+  
   # Summarize area within eez 
   area_by_eez <- terra::extract(eez_cells_area, eez, fun = sum, na.rm = TRUE)
 
@@ -412,30 +445,77 @@ suitability_fun <- function(sst_min, sst_max, depth_min, depth_max, species) {
   # Join area back into polygons
   eez_area <- eez %>%
     left_join(area_by_eez, by = "ID")
+  
+# 5. Make table of suitable area per eez 
+  
+rgns <- c("Oregon", "Northern California", "Central California", 
+            "Southern California", "Washington")
+
+  rgn_table <- data.frame(
+    rgn = rgns,
+    area_km2 = eez_area$area[1:5]
+  )
+
+  print(rgn_table %>%
+    kable(col.names = c("Region", "Suitable Habitat (km²)"),
+          caption = paste("Table 2. Suitable Area for", species)) %>%
+    kable_styling(bootstrap_options = "striped", full_width = FALSE))
 
   # Create map 
-  species_map <- tm_shape(eez_area) +
-    tm_polygons(fill = "area_km2") +
-    tm_layout(title = paste("Suitable Habitat for", species))
+  
+species_map <- tm_tiles("Esri.WorldImagery", alpha = 0.7) + # basemap with tm_tiles()
+tm_shape(eez_area) +
+  tm_polygons(fill = "area" , # fill polygons based on suitable area 
+              style = "cont", # continuous value scale 
+    palette = c("#9ef7f0", "#1d524d"), # palette of colors 
+    title = "Suitable habitat (km²)", size = 0.8) + # legend title 
+  tm_layout(legend.outside = TRUE, 
+            legend.text.size = 0.5) + # legend position and size 
+  tm_title(
+  paste0("Suitable Habitat Range for ", species, " Aquaculture"),
+  fontface = "bold",
+  size = 1
+)+ # title 
+  tm_graticules(lwd = 0.2) + # gridlines 
+  tm_scalebar(position = c("left", "bottom"), text.size = 0.5) + #scalebar 
+  tm_text("rgn", # overlay text for region
+          size = 0.5,  
+          xmod = 0.3,
+  ymod = 0.2)
 
-  return(species_map)
+
+# return species map and table of eez suitable area 
+return(species_map) 
+
 }
 
 ```
 
 ## Apply function: Blue Mussels 
-
+In this section I will apply the `suitability_fun` function to my second focal species **blue mussels**. I will then *reproduce* my `oyster_map` with my function. 
 ```{r}
-
-# 5- 20
-# 0-60 
+#| label: Blue mussels function
 
 suitability_fun(
-  sst_min = 5,
-  sst_max = 20,
-  depth_min = 0,
-  depth_max = 60,
-  species = "Blue Mussel"
+  sst_min = 5, # define min stt value
+  sst_max = 20, # define max sst value
+  depth_min = 0, # define min depth value
+  depth_max = 60, # define max depth value 
+  species = "Blue Mussel" # define species name 
+)
+
+
+```
+
+```{r}
+#| label: Oyster function reproduce 
+
+suitability_fun(
+  sst_min = 11, # define min stt value
+  sst_max = 30, # define max sst value
+  depth_min = 0, # define min depth value
+  depth_max = 70, # define max depth value 
+  species = "Oyster" # define species name 
 )
 
 
