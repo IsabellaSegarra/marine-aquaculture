@@ -12,7 +12,7 @@ execute:
 ---
 # Assessing Potential Species for Marine Aquaculture in West Coast EEZs
 
-![README](
+![README](images/marine-aqua-README.png)
 
 ## Objectives:
 Marine aquaculture has become popular for its use as a more suitable protein option than land-based meat production.In this project, I investigated where to prioritize marine aquaculture in the West Coast of the United States. I focused on two focal species: **oysters** and **blue mussels**. 
@@ -456,10 +456,10 @@ rgns <- c("Oregon", "Northern California", "Central California",
     area_km2 = eez_area$area[1:5]
   )
 
-  print(rgn_table %>%
+  rgn_table %>%
     kable(col.names = c("Region", "Suitable Habitat (km²)"),
           caption = paste("Table 2. Suitable Area for", species)) %>%
-    kable_styling(bootstrap_options = "striped", full_width = FALSE))
+    kable_styling(bootstrap_options = "striped", full_width = FALSE)
 
   # Create map 
   
