@@ -310,25 +310,52 @@ if (ncell(suitable_locations) == ncell(eez_cells)) {
 ```
 
 ```{r}
+# to fix:
+#- rasterize eez 
+
+#zonal(x = cell size * masked, z = eez_raster)
+```
+
+
+```{r}
 #| label: Calculate total area
 #......Calculate total area ......
+
+# make sure eez and eez cells extent match
+if (ext(eez) == ext(eez_cells)) {
+  message("Extents match!")
+} else {
+  warning("Extents don't match! Cropping eez_cells to match eez extent...")
+  eez_cells <- crop(eez_cells, ext(eez))
+}
 
 # Calculate cell size area of each raster cell
 eez_cells_area <- cellSize(eez_cells, unit = "km")
 
 #......Find total area......
 
-# Extract raster values per polygon, sum within each polygon
-# Result is a data frame 
-area_by_eez <- terra::extract(eez_cells_area, eez, fun = sum, na.rm = TRUE)
+# Rasterize eez
+rast_eez <- rasterize(eez, eez_cells, field = "rgn_id")
 
-kable(area_by_eez)
+# perform zonal operation 
+area_by_eez<- zonal(x = eez_cells_area * eez_cells, z = rast_eez, fun = "sum", na.rm = TRUE)
+
+
 
 ```
 
 ```{r}
 #| label: Join data
 #......Join data......
+
+eez_suitable_locations <- area_by_eez %>% 
+  cbind(eez, by = "rgn_id")
+
+# clean up data frame
+
+eez_suitable_locations <- eez_suitable_locations %>% 
+  rename(area_suitable = area) %>% 
+  select("rgn","area_suitable", "geometry")
 
 # Add polygon IDs to eez 
 eez <- eez %>%
