@@ -84,7 +84,7 @@ species_table %>%
 
 ### Sea Surface Temperature Data
 In this study, I will use average annual sea surface temperature (SST) from 2008 to 2012. The data is from NOAA's Daily Global Satellite Sea Surface Temperature anomaly. 
-It contains the following data: 
+
 ```{r}
 #| label: import SST 
 #| output: false 
@@ -114,7 +114,7 @@ avg_sst <- mean(sst)
 avg_sst_c <- avg_sst - 273.15
 
 # Clear working environment
-rm(list = 'avg_sst')
+rm(avg_sst)
 
 ```
 
@@ -253,7 +253,8 @@ I now have suitable locations for the specific sea surface temperature and depth
 #| label: Suitable locations
 #......Find suitable locations......
 
-# Multiply reclassification matrices to find suitable locations 
+# Multiply reclassification matrices to find suitable locations
+# creates matrix of 0/1 where 0 = not suitable and 1 = suitable 
 suitable_locations <- sst_rcl * depth_rcl 
 
 
@@ -310,14 +311,6 @@ if (ncell(suitable_locations) == ncell(eez_cells)) {
 ```
 
 ```{r}
-# to fix:
-#- rasterize eez 
-
-#zonal(x = cell size * masked, z = eez_raster)
-```
-
-
-```{r}
 #| label: Calculate total area
 #......Calculate total area ......
 
@@ -348,22 +341,17 @@ area_by_eez<- zonal(x = eez_cells_area * eez_cells, z = rast_eez, fun = "sum", n
 #| label: Join data
 #......Join data......
 
-eez_suitable_locations <- area_by_eez %>% 
-  cbind(eez, by = "rgn_id")
+eez_suitable_locations <- area_by_eez %>%
+  left_join(eez, by = "rgn_id")
 
 # clean up data frame
 
 eez_suitable_locations <- eez_suitable_locations %>% 
-  rename(area_suitable = area) %>% 
-  select("rgn","area_suitable", "geometry")
+  rename(area_suitable_km = area) %>% # rename area
+  select(rgn, area_suitable_km, geometry) # select for region, area, and geometry to plot 
 
-# Add polygon IDs to eez 
-eez <- eez %>%
-  rename(ID = rgn_id)
-
-# Join the raster summaries back to eez polygons df 
-eez_area <- eez %>%
-  left_join(area_by_eez, by = "ID")
+#.....Convert to sf object....
+eez_suitable_locations <- st_as_sf(eez_suitable_locations)
 
 ```
 
@@ -375,7 +363,7 @@ rgns <- c("Oregon", "Northern California", "Central California", "Southern Calif
 
 rgn_table <- data.frame(
   rgns,
-  area_km2 = eez_area$area[1:5]
+  area_km2 = eez_suitable_locations$area[1:5]
 )
 
 # Put together with ‘kableExtra’
@@ -387,9 +375,9 @@ rgn_table %>%
 ```{r}
 
 #| label: oyster map
-oyster_map <- tm_tiles("Esri.WorldImagery", alpha = 0.6) + # basemap with tm_tiles()
-tm_shape(eez_area) +
-  tm_polygons(fill = "area" , # fill polygons based on suitable area 
+oyster_map <- tm_tiles("Esri.WorldImagery", alpha = 0.7) + # basemap with tm_tiles()
+tm_shape(eez_suitable_locations) +
+  tm_polygons(fill = "area_suitable_km" , # fill polygons based on suitable area 
               style = "cont", # continuous value scale 
     palette = c("#9ef7f0", "#1d524d"), # palette of colors 
     title = "Suitable habitat (km²)", size = 0.8) + # legend title 
@@ -415,8 +403,9 @@ The purpose of this section is to define a function that can be used with any ma
 suitability_fun <- function(sst_min, sst_max, depth_min, depth_max, species) {
 
 # Ensure avg_sst_c and depth are new
-avg_sst_c <- rast(avg_sst_c)
-depth <- rast(depth)
+#avg_sst_c <- rast(get("avg_sst_c", envir = .GlobalEnv))
+#depth <- rast(get("depth", envir = .GlobalEnv))
+#eez <- get("eez", envir = .GlobalEnv)
   
 # 1. Reclassification matrices 
   
@@ -431,13 +420,16 @@ depth <- rast(depth)
   )
 
   # Define Depth reclassification matrix 
-  depth_matrix <- matrix(
-    c(-Inf, depth_min, 0,  # below min depth = 0/unsuitable
-       depth_min, depth_max, 1,  # range of depth = 1/suitable
-       depth_max, Inf, 0         #  range of depth = 1/suitable
-      ),
-    ncol = 3, byrow = TRUE
-  )
+dmin <- min(depth_min, depth_max) # ensure depth min is the smaller depth
+dmax <- max(depth_min, depth_max) 
+
+depth_matrix <- matrix(
+  c(-Inf, -dmax, 0,
+    -dmax, -dmin, 1,
+    -dmin, Inf, 0),
+  ncol = 3, byrow = TRUE
+)
+  
 # 2. Reclassify SST and Depth data 
   
   # Reclassify SST 
@@ -449,7 +441,7 @@ depth <- rast(depth)
   depth_rcl <- terra::classify(depth, rcl = depth_matrix)
   
 # 3. Find suitable locations
-  # Find suitable locations
+  # Multiply reclassifications to create matrix of 0/1
   suitable_locations <- sst_rcl * depth_rcl
 
   # Convert zeros to NAs
@@ -461,38 +453,30 @@ depth <- rast(depth)
   # Find cell area
   eez_cells_area <- cellSize(eez_cells, unit = "km")
 
-# 4. Summarize and create df 
+# 4. Zonal operation
   
-  # Summarize area within eez 
-  area_by_eez <- terra::extract(eez_cells_area, eez, fun = sum, na.rm = TRUE)
+  # Rasterize eez
+rast_eez <- rasterize(eez, eez_cells, field = "rgn_id")
 
-  # Add ID 
-  #eez <- eez %>% rename(ID = rgn_id)
+  # perform zonal operation 
+area_by_eez<- zonal(x = eez_cells_area * eez_cells, z = rast_eez, fun = "sum", na.rm = TRUE)
 
-  # Join area back into polygons
-  eez_area <- eez %>%
-    left_join(area_by_eez, by = "ID")
+# 5. Join data 
+
+eez_suitable_locations <- area_by_eez %>%
+  left_join(eez, by = "rgn_id") %>% # join on 'rgn_id'
+  rename(area_suitable_km = area) %>% # rename column
+  select(rgn, area_suitable_km, geometry) # select certain columns for df
+
+# 6. Convert to sf object
+eez_suitable_locations <- st_as_sf(eez_suitable_locations)
   
-# 5. Make table of suitable area per eez 
-  
-rgns <- c("Oregon", "Northern California", "Central California", 
-            "Southern California", "Washington")
 
-  rgn_table <- data.frame(
-    rgn = rgns,
-    area_km2 = eez_area$area[1:5]
-  )
-
-  rgn_table %>%
-    kable(col.names = c("Region", "Suitable Habitat (km²)"),
-          caption = paste("Table 2. Suitable Area for", species)) %>%
-    kable_styling(bootstrap_options = "striped", full_width = FALSE)
-
-  # Create map 
+# 7.  Create map 
   
 species_map <- tm_tiles("Esri.WorldImagery", alpha = 0.7) + # basemap with tm_tiles()
-tm_shape(eez_area) +
-  tm_polygons(fill = "area" , # fill polygons based on suitable area 
+tm_shape(eez_suitable_locations) +
+  tm_polygons(fill = "area_suitable_km" , # fill polygons based on suitable area 
               style = "cont", # continuous value scale 
     palette = c("#9ef7f0", "#1d524d"), # palette of colors 
     title = "Suitable habitat (km²)", size = 0.8) + # legend title 
@@ -533,7 +517,7 @@ suitability_fun(
 
 
 ```
-
+Now I will try to reproduce the oyster map with my function to ensure my function worked. 
 ```{r}
 #| label: Oyster function reproduce 
 
@@ -547,4 +531,9 @@ suitability_fun(
 
 
 ```
+## Reflections 
+
+- the importance of reproducibility 
+- the use of functions like these for determinging species
+
 
