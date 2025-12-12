@@ -35,6 +35,8 @@ Flanders Marine Institute. (2025). Maritime Boundaries Geodatabase: Exclusive Ec
 
 "Mytilus edulis." MarLIN – The Marine Life Information Network, n.d., https://www.marlin.ac.uk/assets/images/marlin/species/web/o_mytedu.jpg. Accessed 29 Nov. 2025.
 
+Gentry, R.R., Froehlich, H.E., Grimm, D. et al. Mapping the global potential for marine aquaculture. Nat Ecol Evol 1, 1317–1324 (2017). https://doi.org/10.1038/s41559-017-0257-9 
+
 
 ### Acknowledgements
 I would like to acknowledge Dr. Annie Adams and Ale Vidal Meza for their contributions to this project.

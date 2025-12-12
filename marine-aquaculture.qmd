@@ -375,26 +375,28 @@ rgn_table %>%
 ```{r}
 
 #| label: oyster map
-oyster_map <- tm_tiles("Esri.WorldImagery", alpha = 0.7) + # basemap with tm_tiles()
+
+oyster_map <-
+  tm_basemap("Esri.WorldImagery") +
 tm_shape(eez_suitable_locations) +
   tm_polygons(fill = "area_suitable_km" , # fill polygons based on suitable area 
               style = "cont", # continuous value scale 
     palette = c("#9ef7f0", "#1d524d"), # palette of colors 
     title = "Suitable habitat (km²)", size = 0.8) + # legend title 
   tm_layout(legend.outside = TRUE, 
-            legend.text.size = 0.5) + # legend position and size
-  tm_title("Suitable Habitat Range for Oyster Aquaculture", fontface = "bold", size = 0.8) + # title 
+            legend.text.size = 0.5) +
+  tm_title(paste("Suitable Habitat Range For", "Oyster Aquaculture", sep = "\n"), size = 1)  +
   tm_graticules(lwd = 0.2) + # gridlines 
-  tm_scalebar(position = c("left", "bottom"), text.size = 0.5) + #scalebar 
+  tm_scalebar(position = c("left", "bottom"), text.size = 0.3)+ #scalebar 
   tm_text("rgn", # overlay text for region
-          size = 0.5,  
+          size = 0.4,  
           xmod = -0.2,
-  ymod = 0.2)
+  ymod = 0.3)
                 
 # View map
 oyster_map 
 ```
-*Reflection*: The map above depicts the suitable locations for oyster aquaculture within West Coast EEZs. As you can see, the regions with the most suitable habitat are Central and Southern California. 
+*Reflection*: The map above depicts the suitable locations for oyster aquaculture within West Coast EEZs. The regions with the most suitable habitat are Central and Southern California. The region with the least amount of suitable region is Northern California. 
 
 ## Generalizable function
 The purpose of this section is to define a function that can be used with any marine species of interest for marine aquaculture. 
@@ -470,25 +472,22 @@ eez_suitable_locations <- st_as_sf(eez_suitable_locations)
 
 # 7.  Create map 
   
-species_map <- tm_tiles("Esri.WorldImagery", alpha = 0.7) + # basemap with tm_tiles()
+species_map <-
+tm_basemap("Esri.WorldImagery") +
 tm_shape(eez_suitable_locations) +
   tm_polygons(fill = "area_suitable_km" , # fill polygons based on suitable area 
               style = "cont", # continuous value scale 
     palette = c("#9ef7f0", "#1d524d"), # palette of colors 
     title = "Suitable habitat (km²)", size = 0.8) + # legend title 
   tm_layout(legend.outside = TRUE, 
-            legend.text.size = 0.5) + # legend position and size 
-  tm_title(
-  paste0("Suitable Habitat Range for ", species, " Aquaculture"),
-  fontface = "bold",
-  size = 1
-)+ # title 
+            legend.text.size = 0.5) +
+  tm_title(paste("Suitable Habitat Range For", "\n", species, "Marine Aquaculture"), size = 1) +
   tm_graticules(lwd = 0.2) + # gridlines 
-  tm_scalebar(position = c("left", "bottom"), text.size = 0.5) + #scalebar 
+  tm_scalebar(position = c("left", "bottom"), text.size = 0.3)+ #scalebar 
   tm_text("rgn", # overlay text for region
-          size = 0.5,  
+          size = 0.4,  
           xmod = -0.2,
-  ymod = 0.2)
+  ymod = 0.3)
 
 
 # return species map and table of eez suitable area 
@@ -513,7 +512,7 @@ suitability_fun(
 
 
 ```
-*Reflection*: The map above depicts the suitable locations for blue mussel aquaculture within West Coast EEZs. As you can see, the regions with the most suitable habitat are Washington. The rest of the California and Oregon coast contain less suitable locations probably due to the temperature range for blue mussels, who prefer colder temperatures. 
+*Reflection*: The map above depicts the suitable locations for blue mussel aquaculture within West Coast EEZs. The regions with the most suitable habitat are Washington. The rest of the California and Oregon coast contain less suitable locations probably due to the temperature range for blue mussels, who prefer colder temperatures. 
 
 ## Reproducibility check 
 Now I will try to reproduce the oyster map with my function to ensure my function worked. 
@@ -531,9 +530,5 @@ suitability_fun(
 
 ```
 ## Reflections 
-This project investigated the suitable habitats for two focal species --oyster and blue mussel-- for marine aquaculture in West Coast Economic Exclusive Zones. 
-
-- the importance of reproducibility 
-- the use of functions like these for determinging species
-
+This project investigated the suitable habitats for two focal species --oyster and blue mussel-- for marine aquaculture in West Coast Economic Exclusive Zones. Through the process of mapping suitable habitat I was able to streamline my workflow into a generalizable function. Functions like `suitability_fun` are useful for reproducibility as well as applications beyond the scope of your data. If I were to expand this study I would include more biological constraints such as those mentioned in Gentry et al. 2017. 
 
